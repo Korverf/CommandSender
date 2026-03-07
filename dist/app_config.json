@@ -1,0 +1,14 @@
+{
+  "commands_dir": "commands",
+  "delay_after_focus": 0.3,
+  "delay_between_keys": 0.005,
+  "use_clipboard": true,
+  "recent_files": [
+    "D:/Feng/2-自学资料/scripts/openclaw.txt",
+    "commands\\openclaw.txt",
+    "commands\\3_Python.txt",
+    "commands\\1_PowerShell.txt",
+    "commands\\2_Git.txt"
+  ],
+  "last_directory": "D:/Feng/2-自学资料/scripts"
+}

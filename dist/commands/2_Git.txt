@@ -1,0 +1,6 @@
+# Git 常用命令
+git status
+git add .
+git commit -m "update"
+git push
+git pull
