@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 跨平台命令行发送工具
 支持 Windows 和 Linux (Ubuntu 22.04)
@@ -24,10 +25,54 @@ def _get_pyautogui():
 
 # 平台抽象层
 from window_manager import create_window_manager, SYSTEM
+import tkinter.font as tkfont
 
 # 配置文件
 CONFIG_FILE = 'app_config.json'
 COMMANDS_DIR = 'commands'
+
+# 跨平台字体配置
+_FONT_TEXT = None
+_FONT_UI = None
+
+
+def _get_available_font(candidates):
+    """从候选字体列表中选择第一个可用的字体"""
+    available = set(tkfont.families())
+    for font_name in candidates:
+        if font_name in available:
+            return font_name
+    return candidates[0]  # 回退到第一个候选
+
+
+def _init_fonts():
+    """延迟初始化字体，避免模块导入时调用 tkfont.families() 崩溃"""
+    global _FONT_TEXT, _FONT_UI
+    if _FONT_TEXT is not None:
+        return
+    if SYSTEM == 'Windows':
+        _FONT_TEXT = _get_available_font(['Consolas', 'Courier New', 'DejaVu Sans Mono', 'monospace'])
+        _FONT_UI = _get_available_font(['Microsoft YaHei', 'SimHei', 'Arial', 'sans-serif'])
+    else:
+        _FONT_TEXT = _get_available_font([
+            'Noto Sans Mono CJK SC', 'Noto Sans Mono CJK',
+            'DejaVu Sans Mono', 'Ubuntu Mono', 'monospace'
+        ])
+        _FONT_UI = _get_available_font([
+            'Noto Sans CJK SC', 'Noto Sans CJK',
+            'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei',
+            'DejaVu Sans', 'sans-serif'
+        ])
+
+
+def get_font_text():
+    _init_fonts()
+    return _FONT_TEXT
+
+
+def get_font_ui():
+    _init_fonts()
+    return _FONT_UI
 
 # 应用标题
 APP_TITLE = '命令行发送工具 v2.0'
@@ -61,6 +106,7 @@ class CommandSenderApp:
         self.delay_after_focus = 0.3
         self.delay_between_keys = 0.005
         self.use_clipboard = True
+        self._save_pending = False  # 延迟保存标志
 
         # 创建命令目录
         if not os.path.exists(self.commands_dir):
@@ -123,7 +169,7 @@ python -m pip install --upgrade pip"""
 
         ttk.Label(top_frame, text="最近文件:").pack(side=tk.LEFT)
 
-        self.recent_combo = ttk.Combobox(top_frame, width=35, font=('Arial', 10), state='readonly')
+        self.recent_combo = ttk.Combobox(top_frame, width=35, font=(get_font_ui(), 10), state='readonly')
         self.recent_combo.pack(side=tk.LEFT, padx=5)
         self.recent_combo.bind('<<ComboboxSelected>>', self.on_recent_file_select)
 
@@ -136,7 +182,7 @@ python -m pip install --upgrade pip"""
         text_frame = ttk.LabelFrame(main_frame, text="命令内容（用鼠标拖拽选择）", padding="5")
         text_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
 
-        self.text_widget = tk.Text(text_frame, font=("Consolas", 11), wrap=tk.NONE,
+        self.text_widget = tk.Text(text_frame, font=(get_font_text(), 11), wrap=tk.NONE,
                                    undo=True, maxundo=-1)
         v_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text_widget.yview)
         h_scroll = ttk.Scrollbar(text_frame, orient=tk.HORIZONTAL, command=self.text_widget.xview)
@@ -166,7 +212,7 @@ python -m pip install --upgrade pip"""
         send_frame.pack(side=tk.LEFT, padx=10)
 
         style = ttk.Style()
-        style.configure('SendButton.TButton', font=('Arial', 10, 'bold'), foreground='black')
+        style.configure('SendButton.TButton', font=(get_font_ui(), 10, 'bold'), foreground='black')
 
         ttk.Button(send_frame, text="发送选中内容", command=self.send_selected_text,
                    style='SendButton.TButton').pack()
@@ -202,7 +248,19 @@ python -m pip install --upgrade pip"""
         except Exception:
             pass
 
-    def save_config(self):
+    def save_config(self, immediate=False):
+        """保存配置，默认合并短时间内的多次调用"""
+        if not immediate:
+            if self._save_pending:
+                return
+            self._save_pending = True
+            self.root.after(500, self._do_save_config)
+        else:
+            self._do_save_config()
+
+    def _do_save_config(self):
+        """实际执行配置写入"""
+        self._save_pending = False
         try:
             config = {
                 'commands_dir': self.commands_dir,
@@ -268,13 +326,18 @@ python -m pip install --upgrade pip"""
         self.save_config()
 
     def load_file_content(self, filepath):
-        """加载文件内容"""
+        """加载文件内容（禁用 undo 加速大文件加载）"""
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
 
+            # 禁用 undo 避免逐字符记录历史导致卡顿
+            was_undo = self.text_widget['undo']
+            self.text_widget.configure(undo=False)
             self.text_widget.delete('1.0', tk.END)
             self.text_widget.insert('1.0', content)
+            self.text_widget.edit_reset()          # 清空 undo/redo 栈
+            self.text_widget.configure(undo=was_undo)
 
             commands_abs = os.path.abspath(self.commands_dir)
             file_abs = os.path.abspath(filepath)
@@ -523,7 +586,7 @@ python -m pip install --upgrade pip"""
             except Exception:
                 pass
 
-        self.save_config()
+        self.save_config(immediate=True)
         self.wm.cleanup()
         self.root.destroy()
 

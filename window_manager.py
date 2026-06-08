@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 平台抽象层 - 窗口管理器
 为 Windows 和 Linux (Ubuntu 22.04) 提供统一的窗口操作接口
