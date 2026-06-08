@@ -102,6 +102,18 @@ mkdir -p "$HOME/.config/commandsender/commands"
 cp -n commands/*.txt "$HOME/.config/commandsender/commands/" 2>/dev/null || true
 mkdir -p "$HOME/.config/commandsender"
 
+# Fix Xauthority for WSLg/X11 environments
+echo "[*] Configuring X11 authentication..."
+if [ -z "$XAUTHORITY" ] && [ ! -f "$HOME/.Xauthority" ]; then
+    if command -v xauth &> /dev/null; then
+        DISPLAY=${DISPLAY:-:0} xauth generate $DISPLAY . timeout 0 2>/dev/null || {
+            touch "$HOME/.Xauthority"
+        }
+    else
+        touch "$HOME/.Xauthority"
+    fi
+fi
+
 # Create initial config
 if [ ! -f "$HOME/.config/commandsender/app_config.json" ]; then
     cat > "$HOME/.config/commandsender/app_config.json" << 'CONFEOF'
