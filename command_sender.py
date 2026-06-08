@@ -4,12 +4,23 @@
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-import pyautogui
 import time
 import json
 import os
 import sys
 import glob
+
+_pyautogui = None
+
+
+def _get_pyautogui():
+    """延迟导入 pyautogui，避免在无 X11 环境中启动即崩溃"""
+    global _pyautogui
+    if _pyautogui is None:
+        import pyautogui
+        pyautogui.FAILSAFE = True
+        _pyautogui = pyautogui
+    return _pyautogui
 
 # 平台抽象层
 from window_manager import create_window_manager, SYSTEM
@@ -397,9 +408,10 @@ python -m pip install --upgrade pip"""
                 self.wm.activate_window(win_id)
                 time.sleep(0.2)
 
-            pyautogui.hotkey('ctrl', 'v')
+            pag = _get_pyautogui()
+            pag.hotkey('ctrl', 'v')
             time.sleep(0.1)
-            pyautogui.press('enter')
+            pag.press('enter')
 
             time.sleep(0.2)
             try:
@@ -418,8 +430,9 @@ python -m pip install --upgrade pip"""
             if win_id is not None:
                 self.wm.activate_window(win_id)
 
-            pyautogui.write(text, interval=self.delay_between_keys)
-            pyautogui.press('enter')
+            pag = _get_pyautogui()
+            pag.write(text, interval=self.delay_between_keys)
+            pag.press('enter')
 
             return True
         except Exception:
@@ -516,8 +529,6 @@ python -m pip install --upgrade pip"""
 
 
 if __name__ == "__main__":
-    pyautogui.FAILSAFE = True
-
     root = tk.Tk()
     app = CommandSenderApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)

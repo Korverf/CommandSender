@@ -33,7 +33,7 @@ if ! command -v xdotool &> /dev/null; then
 fi
 
 echo "[2/4] Installing Python dependencies..."
-pip3 install pyautogui pyperclip pyinstaller -q
+pip3 install pyautogui pyperclip pyinstaller -q --break-system-packages
 
 echo "[3/4] Building executable..."
 python3 -m PyInstaller --onefile --windowed --name "CommandSender" --clean command_sender.py

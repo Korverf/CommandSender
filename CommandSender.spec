@@ -11,6 +11,7 @@ a = Analysis(
     hiddenimports=[
         'window_manager',
         'pyperclip',
+        'pyautogui',
         'tkinter',
     ],
     hookspath=[],
