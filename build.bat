@@ -20,7 +20,7 @@ if errorlevel 1 (
 )
 
 echo [1/3] Installing dependencies...
-python -m pip install pyautogui pyperclip pywin32 pyinstaller -q
+python -m pip install pyautogui pyperclip pyinstaller -q
 
 echo [2/3] Building...
 python -m PyInstaller --onefile --windowed --name "CommandSender" --clean command_sender.py
