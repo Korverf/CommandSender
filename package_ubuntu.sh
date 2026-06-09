@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION="2.0.0"
+VERSION="2.0.1"
 PACKAGE_NAME="CommandSender-${VERSION}-ubuntu22.04"
 BUILD_DIR="dist/${PACKAGE_NAME}"
 
@@ -64,7 +64,7 @@ cat > "${BUILD_DIR}/install.sh" << 'INSTALLEOF'
 set -e
 
 echo "============================================"
-echo "  CommandSender v2.0.0 Installer"
+echo "  CommandSender v2.0.1 Installer"
 echo "  Target: Ubuntu 22.04"
 echo "============================================"
 echo ""

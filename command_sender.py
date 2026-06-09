@@ -120,11 +120,11 @@ def get_font_ui():
     return _FONT_UI
 
 # 应用标题
-APP_TITLE = '命令行发送工具 v2.0'
+APP_TITLE = '命令行发送工具 v2.0.1'
 if SYSTEM == 'Windows':
-    APP_TITLE = 'Windows 命令发送工具 v2.0'
+    APP_TITLE = 'Windows 命令发送工具 v2.0.1'
 elif SYSTEM == 'Linux':
-    APP_TITLE = 'Linux 命令发送工具 v2.0 (Ubuntu 22.04)'
+    APP_TITLE = 'Linux 命令发送工具 v2.0.1 (Ubuntu 22.04)'
 
 
 class CommandSenderApp:
