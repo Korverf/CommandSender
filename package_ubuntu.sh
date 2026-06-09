@@ -29,13 +29,16 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/bin"
 mkdir -p "${BUILD_DIR}/commands"
 mkdir -p "${BUILD_DIR}/share/applications"
-mkdir -p "${BUILD_DIR}/share/icons/hicolor/256x256/apps"
+mkdir -p "${BUILD_DIR}/share/icons/hicolor/48x48/apps"
 
 # Copy executable
 cp dist/CommandSender "${BUILD_DIR}/bin/"
 
 # Copy sample commands
 cp dist/commands/*.txt "${BUILD_DIR}/commands/" 2>/dev/null || true
+
+# Copy icon
+cp "$SCRIPT_DIR/commandsender.png" "${BUILD_DIR}/share/icons/hicolor/48x48/apps/commandsender.png"
 
 # Create .desktop file
 cat > "${BUILD_DIR}/share/applications/commandsender.desktop" << 'DESKTOPEOF'
@@ -46,7 +49,7 @@ Name[zh_CN]=命令行发送工具
 Comment=Cross-platform command line sending tool
 Comment[zh_CN]=跨平台命令行批量发送工具
 Exec=/usr/local/bin/CommandSender
-Icon=commandsender
+Icon=/usr/share/icons/hicolor/48x48/apps/commandsender.png
 Terminal=false
 Categories=Utility;Development;
 Keywords=command;terminal;send;batch;
@@ -94,6 +97,13 @@ sudo chmod +x /usr/local/bin/CommandSender
 echo "[*] Installing desktop entry..."
 if [ -d share/applications ]; then
     sudo cp share/applications/commandsender.desktop /usr/share/applications/
+fi
+
+# Install icon
+echo "[*] Installing application icon..."
+if [ -f share/icons/hicolor/48x48/apps/commandsender.png ]; then
+    sudo mkdir -p /usr/share/icons/hicolor/48x48/apps
+    sudo cp share/icons/hicolor/48x48/apps/commandsender.png /usr/share/icons/hicolor/48x48/apps/
 fi
 
 # Install sample commands
@@ -153,6 +163,7 @@ set -e
 echo "Uninstalling CommandSender..."
 sudo rm -f /usr/local/bin/CommandSender
 sudo rm -f /usr/share/applications/commandsender.desktop
+sudo rm -f /usr/share/icons/hicolor/48x48/apps/commandsender.png
 echo "Done. User data at ~/.config/commandsender/ is preserved."
 UNINSTALLEOF
 

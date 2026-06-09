@@ -1,19 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec file for CommandSender (cross-platform)
-# Windows: python -m PyInstaller CommandSender.spec
-# Linux:   python3 -m PyInstaller CommandSender.spec
+
 
 a = Analysis(
     ['command_sender.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=[
-        'window_manager',
-        'pyperclip',
-        'pyautogui',
-        'tkinter',
-    ],
+    datas=[('commandsender.png', '.')],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

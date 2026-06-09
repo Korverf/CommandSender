@@ -45,6 +45,42 @@ def _get_available_font(candidates):
     return candidates[0]  # 回退到第一个候选
 
 
+def _get_system_cjk_font():
+    """通过 fontconfig 获取系统最佳 CJK 无衬线字体"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['fc-match', '-f', '%{family[0]}', 'sans-serif:lang=zh-cn'],
+            capture_output=True, text=True, timeout=3
+        )
+        family = result.stdout.strip()
+        if family and ',' in family:
+            family = family.split(',')[0].strip()
+        if family:
+            return family
+    except Exception:
+        pass
+    return None
+
+
+def _get_system_mono_font():
+    """通过 fontconfig 获取系统最佳 CJK 等宽字体"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['fc-match', '-f', '%{family[0]}', 'monospace:lang=zh-cn'],
+            capture_output=True, text=True, timeout=3
+        )
+        family = result.stdout.strip()
+        if family and ',' in family:
+            family = family.split(',')[0].strip()
+        if family:
+            return family
+    except Exception:
+        pass
+    return None
+
+
 def _init_fonts():
     """延迟初始化字体，避免模块导入时调用 tkfont.families() 崩溃"""
     global _FONT_TEXT, _FONT_UI
@@ -54,14 +90,23 @@ def _init_fonts():
         _FONT_TEXT = _get_available_font(['Consolas', 'Courier New', 'DejaVu Sans Mono', 'monospace'])
         _FONT_UI = _get_available_font(['Microsoft YaHei', 'SimHei', 'Arial', 'sans-serif'])
     else:
-        _FONT_TEXT = _get_available_font([
-            'Noto Sans Mono CJK SC', 'Noto Sans Mono CJK',
-            'DejaVu Sans Mono', 'Ubuntu Mono', 'monospace'
-        ])
+        # Linux: 优先通过 fontconfig 查询系统最佳 CJK 字体
+        sys_cjk = _get_system_cjk_font()
+        sys_mono = _get_system_mono_font()
+
         _FONT_UI = _get_available_font([
+            sys_cjk if sys_cjk else 'Noto Sans CJK SC',
+            'Noto Sans CJK HK', 'Noto Sans CJK JP',
             'Noto Sans CJK SC', 'Noto Sans CJK',
-            'WenQuanYi Micro Hei', 'WenQuanYi Zen Hei',
-            'DejaVu Sans', 'sans-serif'
+            'AR PL UKai CN', 'WenQuanYi Micro Hei',
+            'WenQuanYi Zen Hei', 'DejaVu Sans',
+            'DejaVu Serif', 'sans-serif'
+        ])
+        _FONT_TEXT = _get_available_font([
+            sys_mono if sys_mono else 'Noto Sans Mono CJK SC',
+            'Noto Sans Mono CJK HK', 'Noto Sans Mono CJK JP',
+            'Noto Sans Mono CJK', 'DejaVu Sans Mono',
+            'Ubuntu Mono', 'monospace'
         ])
 
 
@@ -159,6 +204,20 @@ python -m pip install --upgrade pip"""
             f.write(sample3)
 
     def setup_ui(self):
+        # ===== 设置全局默认字体（确保所有组件中文正常显示）=====
+        # 修改 Tk 默认字体（所有 tk/ttk 组件均会继承此设置）
+        try:
+            default_font = tkfont.nametofont('TkDefaultFont')
+            default_font.configure(family=get_font_ui(), size=10, weight='normal')
+        except Exception:
+            pass
+
+        ui_font = (get_font_ui(), 10)
+        style = ttk.Style()
+        style.configure('.', font=ui_font)
+        style.configure('TLabelframe.Label', font=ui_font)
+        style.configure('TButton', font=ui_font)
+
         # 主框架
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -211,8 +270,7 @@ python -m pip install --upgrade pip"""
         send_frame = ttk.LabelFrame(bottom_frame, text="发送", padding="5")
         send_frame.pack(side=tk.LEFT, padx=10)
 
-        style = ttk.Style()
-        style.configure('SendButton.TButton', font=(get_font_ui(), 10, 'bold'), foreground='black')
+        style.configure('SendButton.TButton', font=(get_font_ui(), 10, 'normal'), foreground='black')
 
         ttk.Button(send_frame, text="发送选中内容", command=self.send_selected_text,
                    style='SendButton.TButton').pack()
@@ -591,8 +649,80 @@ python -m pip install --upgrade pip"""
         self.root.destroy()
 
 
+def create_app_icon(root):
+    """设置应用图标：优先加载 PNG 文件，回退到 PPM 动态生成"""
+    import sys, os
+    
+    # 1. 尝试从 PyInstaller 打包路径加载
+    if getattr(sys, 'frozen', False):
+        base = sys._MEIPASS
+        png_path = os.path.join(base, 'commandsender.png')
+        if os.path.exists(png_path):
+            try:
+                img = tk.PhotoImage(file=png_path)
+                root.iconphoto(True, img)
+                return
+            except Exception:
+                pass
+    
+    # 2. 尝试从当前目录或标准路径加载
+    local_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'commandsender.png'),
+        '/usr/share/icons/hicolor/48x48/apps/commandsender.png',
+    ]
+    for path in local_paths:
+        if os.path.exists(path):
+            try:
+                img = tk.PhotoImage(file=path)
+                root.iconphoto(True, img)
+                return
+            except Exception:
+                pass
+    
+    # 3. 回退：动态生成 PPM 图标
+    try:
+        icon = _generate_ppm_icon()
+        root.iconphoto(True, icon)
+    except Exception:
+        pass
+
+
+def _generate_ppm_icon():
+    """动态生成 48x48 PPM 图标（命令行终端风格）"""
+    w, h, border, corner_r = 48, 48, 3, 4
+    header = f"P6\n{w} {h}\n255\n".encode()
+    corners = [(border, border), (w - 1 - border, border),
+               (border, h - 1 - border), (w - 1 - border, h - 1 - border)]
+    pixels = bytearray()
+    for y in range(h):
+        for x in range(w):
+            at_corner = (x <= border or x >= w - 1 - border) and (y <= border or y >= h - 1 - border)
+            on_border = x <= border or x >= w - 1 - border or y <= border or y >= h - 1 - border
+            in_rounded = False
+            if at_corner:
+                for cx, cy in corners:
+                    dx, dy = x - cx, y - cy
+                    if dx * dx + dy * dy < corner_r * corner_r:
+                        in_rounded = True
+                        break
+            if at_corner and not in_rounded:
+                r, g, b = 0x00, 0x00, 0x00  # 透明通道（用黑色占位）
+            elif on_border:
+                r, g, b = 0x37, 0x6E, 0xA2  # 蓝色边框
+            elif 12 <= x <= 36 and 10 <= y <= 38 and x >= 12 + abs(24 - y) * 0.55:
+                r, g, b = 0x00, 0xCC, 0x88  # 绿色 ">"
+            else:
+                r, g, b = 0x1E, 0x1E, 0x1E  # 深色背景
+            pixels.extend([r, g, b])
+    return tk.PhotoImage(data=header + bytes(pixels))
+
+
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = tk.Tk(className='CommandSender')
     app = CommandSenderApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
+
+    # 设置应用图标（优先文件，回退动态生成）
+    create_app_icon(root)
+
     root.mainloop()
