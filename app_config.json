@@ -1,0 +1,15 @@
+{
+  "commands_dir": "commands",
+  "delay_after_focus": 0.3,
+  "delay_between_keys": 0.005,
+  "use_clipboard": true,
+  "recent_files": [
+    "commands\\1_PowerShell.txt",
+    "commands\\2_Git.txt",
+    "commands\\3_Python.txt",
+    "commands/1_PowerShell.txt",
+    "commands/2_Git.txt",
+    "commands/3_Python.txt"
+  ],
+  "last_directory": ""
+}

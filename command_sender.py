@@ -11,6 +11,13 @@ import os
 import sys
 import glob
 
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
+
 _pyautogui = None
 
 
@@ -79,7 +86,7 @@ APP_TITLE = '命令行发送工具 v2.0'
 if SYSTEM == 'Windows':
     APP_TITLE = 'Windows 命令发送工具 v2.0'
 elif SYSTEM == 'Linux':
-    APP_TITLE = 'Linux 命令发送工具 v2.0 (Ubuntu 22.04)'
+    APP_TITLE = 'CommandSender v2.0 (Ubuntu 22.04)'
 
 
 class CommandSenderApp:
@@ -117,6 +124,9 @@ class CommandSenderApp:
         self.setup_ui()
         self.refresh_file_list()
         self.update_recent_files_display()
+        
+        if self.recent_files:
+            self.load_file_content(self.recent_files[0])
 
     def create_sample_files(self):
         """创建示例文件"""
@@ -159,6 +169,13 @@ python -m pip install --upgrade pip"""
             f.write(sample3)
 
     def setup_ui(self):
+        # 设置 ttk 全局字体（Linux 下必须显式设置，否则使用无 CJK 字形的默认字体）
+        style = ttk.Style()
+        style.configure('TLabel', font=(get_font_ui(), 10))
+        style.configure('TButton', font=(get_font_ui(), 10))
+        style.configure('TLabelFrame', font=(get_font_ui(), 10, 'bold'))
+        style.configure('TCombobox', font=(get_font_ui(), 10))
+
         # 主框架
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -172,6 +189,10 @@ python -m pip install --upgrade pip"""
         self.recent_combo = ttk.Combobox(top_frame, width=35, font=(get_font_ui(), 10), state='readonly')
         self.recent_combo.pack(side=tk.LEFT, padx=5)
         self.recent_combo.bind('<<ComboboxSelected>>', self.on_recent_file_select)
+        
+        ttk.Button(top_frame, text="删除", command=self.delete_selected_recent).pack(side=tk.LEFT, padx=2)
+
+        self.recent_combo.bind('<Button-3>', self.on_recent_right_click)
 
         ttk.Button(top_frame, text="新建", command=self.new_file).pack(side=tk.LEFT, padx=2)
         ttk.Button(top_frame, text="打开", command=self.open_file).pack(side=tk.LEFT, padx=2)
@@ -311,15 +332,38 @@ python -m pip install --upgrade pip"""
                 self.update_recent_files_display()
                 self.save_config()
 
-    def refresh_file_list(self):
-        """刷新文件列表（扫描commands目录）"""
-        pattern = os.path.join(self.commands_dir, '*.txt')
-        files = glob.glob(pattern)
-        files.sort(key=os.path.getmtime, reverse=True)
+    def delete_selected_recent(self):
+        """删除选中的最近文件记录"""
+        idx = self.recent_combo.current()
+        if 0 <= idx < len(self.recent_files):
+            filepath = self.recent_files[idx]
+            filename = os.path.basename(filepath)
+            
+            result = messagebox.askyesno('确认删除', f'确定要从最近文件列表中移除 "{filename}" 吗？')
+            if result:
+                self.recent_files.pop(idx)
+                self.update_recent_files_display()
+                self.save_config()
+                self.status_var.set(f"已从最近文件列表移除: {filename}")
 
-        for f in files:
-            if f not in self.recent_files:
-                self.recent_files.insert(0, f)
+    def on_recent_right_click(self, event):
+        """右键菜单处理"""
+        idx = self.recent_combo.current()
+        if 0 <= idx < len(self.recent_files):
+            menu = tk.Menu(self.root, tearoff=0)
+            menu.add_command(label="删除", command=self.delete_selected_recent)
+            menu.post(event.x_root, event.y_root)
+
+    def refresh_file_list(self):
+        """刷新文件列表（仅在没有用户文件时扫描commands目录）"""
+        if not self.recent_files:
+            pattern = os.path.join(self.commands_dir, '*.txt')
+            files = glob.glob(pattern)
+            files.sort(key=os.path.getmtime, reverse=True)
+
+            for f in files:
+                if f not in self.recent_files:
+                    self.recent_files.insert(0, f)
 
         self.recent_files = self.recent_files[:self.max_recent]
         self.update_recent_files_display()
@@ -502,23 +546,53 @@ python -m pip install --upgrade pip"""
             return False
 
     def get_selected_text(self):
-        """获取选中的文本"""
+        """获取选中的文本（兼容无选择的情况）"""
         try:
             selected = self.text_widget.get(tk.SEL_FIRST, tk.SEL_LAST)
             return selected.strip() if selected else ""
         except Exception:
             return ""
 
+    def get_selected_lines_text(self):
+        """获取选中区域所在行的完整内容，如果没有选中则获取光标所在行"""
+        try:
+            start = self.text_widget.index(tk.SEL_FIRST)
+            end = self.text_widget.index(tk.SEL_LAST)
+            
+            start_line = start.split('.')[0]
+            end_line = end.split('.')[0]
+            
+            start_pos = f"{start_line}.0"
+            end_pos = f"{end_line}.end"
+            
+            full_text = self.text_widget.get(start_pos, end_pos)
+            return full_text.strip()
+        except Exception:
+            return ""
+
+    def get_current_line_text(self):
+        """获取光标所在行的完整内容"""
+        try:
+            cursor_pos = self.text_widget.index(tk.INSERT)
+            line_num = cursor_pos.split('.')[0]
+            line_text = self.text_widget.get(f"{line_num}.0", f"{line_num}.end")
+            return line_text.strip()
+        except Exception:
+            return ""
+
     def send_selected_text(self):
-        """发送选中的文本"""
+        """发送选中区域所在行的完整内容，如果没有选中则发送光标所在行"""
         if self.wm.get_window_id() is None:
             messagebox.showwarning('警告', '请先选择目标窗口！')
             return
 
-        text = self.get_selected_text()
+        text = self.get_selected_lines_text()
+        
+        if not text:
+            text = self.get_current_line_text()
 
         if not text:
-            messagebox.showwarning('警告', '请先用鼠标选择要发送的文本！')
+            messagebox.showwarning('警告', '没有可发送的内容！')
             return
 
         self.do_send(text)
@@ -546,6 +620,8 @@ python -m pip install --upgrade pip"""
 
         self.status_var.set(f"正在发送 {len(lines)} 行命令...")
         self.root.update()
+
+        self.wm.switch_to_english_input()
 
         success_count = 0
         failed_lines = []

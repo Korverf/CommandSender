@@ -1,0 +1,7 @@
+# Shell / Terminal 常用命令
+ls -la
+pwd
+df -h
+free -h
+ping -c 4 8.8.8.8
+top -b -n 1

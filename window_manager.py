@@ -192,6 +192,26 @@ class WindowsWindowManager(BaseWindowManager):
         except Exception:
             return False
 
+    def switch_to_english_input(self):
+        """切换到英文输入法（Windows）"""
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            
+            hwnd = user32.GetForegroundWindow()
+            thread_id = user32.GetWindowThreadProcessId(hwnd, 0)
+            
+            hkl = user32.GetKeyboardLayout(thread_id)
+            lang_id = hkl & 0xFFFF
+            
+            if lang_id != 0x0409:
+                user32.PostMessageW(hwnd, 0x0050, 0, 0x04090409)
+            
+            time.sleep(0.1)
+            return True
+        except Exception:
+            return False
+
     def cleanup(self):
         self.cancel_selection()
         self.close_highlight()
@@ -371,6 +391,17 @@ class LinuxWindowManager(BaseWindowManager):
             if not ok:
                 return False
             time.sleep(0.2)
+            return True
+        except Exception:
+            return False
+
+    def switch_to_english_input(self):
+        """切换到英文输入法（Linux）"""
+        try:
+            _, ok = self._run_xdotool(['key', 'ctrl+space'], timeout=2)
+            if not ok:
+                _, ok = self._run_xdotool(['key', 'shift'], timeout=2)
+            time.sleep(0.1)
             return True
         except Exception:
             return False

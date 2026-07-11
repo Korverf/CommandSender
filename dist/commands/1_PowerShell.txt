@@ -1,6 +1,0 @@
-# PowerShell 常用命令
-Get-Process
-Get-Service
-Get-ChildItem
-ipconfig
-ping 8.8.8.8

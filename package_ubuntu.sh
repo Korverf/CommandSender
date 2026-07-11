@@ -79,6 +79,11 @@ python3 -c "import tkinter" 2>/dev/null || {
     DEPS_TO_INSTALL="$DEPS_TO_INSTALL python3-tk"
 }
 
+# Check for CJK font (required for proper Chinese character display)
+if ! fc-list :lang=zh 2>/dev/null | grep -q .; then
+    DEPS_TO_INSTALL="$DEPS_TO_INSTALL fonts-wqy-microhei"
+fi
+
 if [ -n "$DEPS_TO_INSTALL" ]; then
     echo "[*] Installing system dependencies: $DEPS_TO_INSTALL"
     sudo apt-get update -qq
