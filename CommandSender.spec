@@ -5,7 +5,7 @@ a = Analysis(
     ['command_sender.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('commandsender.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
