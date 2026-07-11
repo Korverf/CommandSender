@@ -129,7 +129,7 @@ def test_config_cn():
 # ── Test 6: Generated package file integrity ──
 @test("安装包文件完整性")
 def test_package_integrity():
-    pkg_path = 'dist/CommandSender-2.0.0-ubuntu22.04.tar.gz'
+    pkg_path = 'dist/CommandSender-2.1.0-ubuntu22.04.tar.gz'
     assert os.path.exists(pkg_path), f"Package not found: {pkg_path}"
     size_mb = os.path.getsize(pkg_path) / (1024 * 1024)
     assert size_mb > 10, f"Package too small: {size_mb:.1f}MB"

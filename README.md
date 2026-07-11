@@ -86,8 +86,8 @@ ping 8.8.8.8
 
 ```bash
 # 下载并解压
-tar xzf CommandSender-2.0.0-ubuntu22.04.tar.gz
-cd CommandSender-2.0.0-ubuntu22.04
+tar xzf CommandSender-2.1.0-ubuntu22.04.tar.gz
+cd CommandSender-2.1.0-ubuntu22.04
 
 # 安装
 ./install.sh
@@ -141,7 +141,7 @@ bash package_ubuntu.sh
 
 输出文件：
 - `dist/CommandSender` (Linux 可执行文件)
-- `dist/CommandSender-2.0.0-ubuntu22.04.tar.gz` (安装包)
+- `dist/CommandSender-2.1.0-ubuntu22.04.tar.gz` (安装包)
 
 ## 注意事项
 

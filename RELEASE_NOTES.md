@@ -1,4 +1,4 @@
-## CommandSender v2.0.0 - 跨平台版本
+## CommandSender v2.1.0 - 功能增强版
 
 ### 适配系统
 - **Windows 10/11**
@@ -21,8 +21,8 @@ sudo apt install xdotool python3-tk
 
 #### 安装
 ```bash
-tar xzf CommandSender-2.0.0-ubuntu22.04.tar.gz
-cd CommandSender-2.0.0-ubuntu22.04
+tar xzf CommandSender-2.1.0-ubuntu22.04.tar.gz
+cd CommandSender-2.1.0-ubuntu22.04
 ./install.sh
 ```
 
@@ -33,7 +33,7 @@ CommandSender
 
 #### 卸载
 ```bash
-cd CommandSender-2.0.0-ubuntu22.04 && ./uninstall.sh
+cd CommandSender-2.1.0-ubuntu22.04 && ./uninstall.sh
 ```
 
 #### 文件位置
@@ -41,7 +41,7 @@ cd CommandSender-2.0.0-ubuntu22.04 && ./uninstall.sh
 - 命令文件: `~/.config/commandsender/commands/`
 - 配置文件: `~/.config/commandsender/app_config.json`
 
-### 变更日志 (v2.0.1)
+### 变更日志 (v2.1.0)
 - **修复** pyautogui 在无 X11 环境下导入即崩溃的问题（改为延迟导入模式）
 - **修复** `build.sh` 在 Ubuntu 24.04+ 上因 PEP 668 限制 pip 安装失败的问题
 
@@ -54,6 +54,6 @@ cd CommandSender-2.0.0-ubuntu22.04 && ./uninstall.sh
 - **新增** 安装包内附 `install.sh` 和 `uninstall.sh`
 
 ### 安装包信息
-- **文件名**: `CommandSender-2.0.0-ubuntu22.04.tar.gz`
+- **文件名**: `CommandSender-2.1.0-ubuntu22.04.tar.gz`
 - **SHA256**: `221dc32205778edd3dab9d077a79ac412f6ef7b3fef74142fc111c1a567518d8`
 - **大小**: 15 MB
