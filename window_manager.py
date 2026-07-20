@@ -228,6 +228,7 @@ class LinuxWindowManager(BaseWindowManager):
         self.target_win_id = None
         self._highlight_win = None
         self._selection_proc = None
+        self._saved_ime = None  # 保存发送前的输入法状态，用于恢复
 
     def get_window_id(self):
         return self.target_win_id
@@ -396,15 +397,91 @@ class LinuxWindowManager(BaseWindowManager):
             return False
 
     def switch_to_english_input(self):
-        """切换到英文输入法（Linux）"""
+        """将输入法切换为英文直接输入（Linux）
+
+        中文输入法（ibus/fcitx）会拦截 xdotool type 的按键，将
+        “tmux new -s train” 这类命令转成拼音候选字（如“汤姆逊…”）。
+        这里直接把输入法切到英文，并保存原状态以便事后恢复。
+        """
+        import shutil
+        self._saved_ime = None
+
+        # 1) ibus：切换 engine 为英文键盘布局，彻底绕过拼音引擎
+        if shutil.which('ibus'):
+            try:
+                cur = subprocess.run(
+                    ['ibus', 'engine'], capture_output=True, text=True, timeout=3
+                ).stdout.strip()
+                if cur and cur != 'xkb:us::eng':
+                    self._saved_ime = ('ibus', cur)
+                subprocess.run(['ibus', 'engine', 'xkb:us::eng'],
+                               capture_output=True, timeout=3)
+                time.sleep(0.15)
+                return True
+            except Exception:
+                pass
+
+        # 2) fcitx5 / fcitx：关闭输入法（即英文直接输入）
+        for tool in ('fcitx5-remote', 'fcitx-remote'):
+            if shutil.which(tool):
+                try:
+                    status = subprocess.run(
+                        [tool], capture_output=True, text=True, timeout=3
+                    ).stdout.strip()
+                    if status == '2':  # 2=激活(中文)，需要事后恢复
+                        self._saved_ime = (tool, 'reactivate')
+                    subprocess.run([tool, '-c'], capture_output=True, timeout=3)
+                    time.sleep(0.15)
+                    return True
+                except Exception:
+                    pass
+
+        # 3) 回退：发送切换快捷键
+        self._run_xdotool(['key', 'ctrl+space'], timeout=2)
+        time.sleep(0.1)
+        return True
+
+    def restore_input_method(self):
+        """恢复发送前的输入法状态（Linux）"""
+        saved = self._saved_ime
+        self._saved_ime = None
+        if not saved:
+            return
         try:
-            _, ok = self._run_xdotool(['key', 'ctrl+space'], timeout=2)
-            if not ok:
-                _, ok = self._run_xdotool(['key', 'shift'], timeout=2)
-            time.sleep(0.1)
-            return True
+            kind, value = saved
+            if kind == 'ibus':
+                subprocess.run(['ibus', 'engine', value],
+                               capture_output=True, timeout=3)
+            else:  # fcitx / fcitx5
+                subprocess.run([kind, '-o'], capture_output=True, timeout=3)
         except Exception:
+            pass
+
+    def send_line(self, text, activate=True):
+        """向目标窗口输入一行文本并回车（Linux）
+
+        使用 xdotool 直接向目标窗口注入按键，避免 pyautogui 在 X11 下
+        将回车/按键事件传成字面量 Ctrl+M（\r），从而在终端显示为 ^M。
+        """
+        if self.target_win_id is None:
             return False
+        wid = str(self.target_win_id)
+
+        # 去除回车符，避免终端出现 ^M
+        text = text.replace('\r\n', '\n').replace('\r', '')
+
+        # 先激活并聚焦目标窗口，type/key 将作用于当前焦点窗口
+        self._run_xdotool(['windowactivate', '--sync', wid], timeout=3)
+        time.sleep(0.05)
+
+        ok = True
+        if text:
+            _, ok = self._run_xdotool(['type', '--clearmodifiers', '--', text])
+
+        time.sleep(0.03)
+        # 使用 Return 键触发执行，终端会将其解析为换行/执行，而非字面 \r
+        _, ok_enter = self._run_xdotool(['key', '--clearmodifiers', 'Return'])
+        return ok and ok_enter
 
     def cleanup(self):
         self.cancel_selection()

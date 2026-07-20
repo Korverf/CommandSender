@@ -265,6 +265,12 @@ python -m pip install --upgrade pip"""
         v_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
         h_scroll.grid(row=1, column=0, sticky=(tk.W, tk.E))
 
+        # 修复 Linux 下 Tk Text 默认粘贴不覆盖选区的问题：
+        # 绑定自定义粘贴处理，先删除选中内容再插入
+        self.text_widget.bind('<<Paste>>', self._on_paste)
+        self.text_widget.bind('<Control-v>', self._on_paste)
+        self.text_widget.bind('<Control-V>', self._on_paste)
+
         text_frame.columnconfigure(0, weight=1)
         text_frame.rowconfigure(0, weight=1)
 
@@ -305,6 +311,29 @@ python -m pip install --upgrade pip"""
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
+
+    def _on_paste(self, event=None):
+        """自定义粘贴：若有选区先删除再插入，实现“覆盖选中内容”
+
+        修复 Linux/X11 下 Tk Text 默认 <<Paste>> 不删除选区、
+        导致粘贴内容出现在选区前/后而非覆盖的问题。
+        """
+        widget = event.widget if event is not None else self.text_widget
+        try:
+            clip = widget.clipboard_get()
+        except Exception:
+            return "break"  # 剪贴板为空或非文本，阻止默认行为
+
+        # 删除当前选区（若有）
+        try:
+            if widget.tag_ranges(tk.SEL):
+                widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except Exception:
+            pass
+
+        widget.insert(tk.INSERT, clip)
+        widget.see(tk.INSERT)
+        return "break"  # 阻止 Tk 默认粘贴绑定重复插入
 
     def load_config(self):
         try:
@@ -662,6 +691,22 @@ python -m pip install --upgrade pip"""
 
         self.do_send(text)
 
+    def send_line(self, line):
+        """发送单行命令，按平台选择最可靠的方式"""
+        # Linux: 优先使用 xdotool 直接注入到目标窗口，
+        # 避免 pyautogui 在 X11 下把回车传成字面 ^M
+        if SYSTEM == 'Linux' and hasattr(self.wm, 'send_line'):
+            if self.wm.send_line(line):
+                return True
+
+        # 其它平台或回退方案：剪贴板 / 键盘模拟
+        success = False
+        if self.use_clipboard:
+            success = self.send_via_clipboard(line)
+        if not success:
+            success = self.send_via_keyboard(line)
+        return success
+
     def do_send(self, text):
         """执行发送"""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -677,23 +722,23 @@ python -m pip install --upgrade pip"""
         success_count = 0
         failed_lines = []
 
-        for line in lines:
-            if line.startswith('#') or line.startswith('//'):
-                continue
+        try:
+            for line in lines:
+                if line.startswith('#') or line.startswith('//'):
+                    continue
 
-            success = False
-            if self.use_clipboard:
-                success = self.send_via_clipboard(line)
+                success = self.send_line(line)
 
-            if not success:
-                success = self.send_via_keyboard(line)
+                if success:
+                    success_count += 1
+                else:
+                    failed_lines.append(line)
 
-            if success:
-                success_count += 1
-            else:
-                failed_lines.append(line)
-
-            time.sleep(0.3)
+                time.sleep(0.3)
+        finally:
+            # 发送完毕后恢复用户原来的输入法（若曾切换）
+            if hasattr(self.wm, 'restore_input_method'):
+                self.wm.restore_input_method()
 
         if failed_lines:
             self.status_var.set(f"发送完成: {success_count}/{len(lines)} 成功")
