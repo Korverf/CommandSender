@@ -53,7 +53,10 @@ Icon=/usr/share/icons/hicolor/48x48/apps/commandsender.png
 Terminal=false
 Categories=Utility;Development;
 Keywords=command;terminal;send;batch;
-StartupWMClass=CommandSender
+# StartupWMClass 必须与应用运行时窗口的 WM_CLASS(res_class)完全一致，
+# 否则 GNOME 无法把运行中的窗口关联到本 .desktop，导致无法“添加到收藏夹”。
+# Tk 由 className='CommandSender' 实际生成的 WM_CLASS 为 (commandSender, Commandsender)。
+StartupWMClass=Commandsender
 DESKTOPEOF
 
 # Step 3: Create install script
@@ -110,6 +113,12 @@ if [ -f share/icons/hicolor/48x48/apps/commandsender.png ]; then
     sudo mkdir -p /usr/share/icons/hicolor/48x48/apps
     sudo cp share/icons/hicolor/48x48/apps/commandsender.png /usr/share/icons/hicolor/48x48/apps/
 fi
+
+# Refresh desktop & icon caches so GNOME immediately recognizes the app
+# (否则卸载重装后同一会话内缓存陈旧，应用无法“添加到收藏夹”)
+echo "[*] Refreshing desktop database and icon cache..."
+sudo update-desktop-database /usr/share/applications 2>/dev/null || true
+sudo gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 
 # Install sample commands
 echo "[*] Installing sample commands..."
@@ -169,6 +178,9 @@ echo "Uninstalling CommandSender..."
 sudo rm -f /usr/local/bin/CommandSender
 sudo rm -f /usr/share/applications/commandsender.desktop
 sudo rm -f /usr/share/icons/hicolor/48x48/apps/commandsender.png
+# Refresh caches so GNOME drops the stale app entry
+sudo update-desktop-database /usr/share/applications 2>/dev/null || true
+sudo gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 echo "Done. User data at ~/.config/commandsender/ is preserved."
 UNINSTALLEOF
 

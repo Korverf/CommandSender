@@ -14,18 +14,46 @@ echo "============================================"
 echo ""
 
 # Check Python
-if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] Python 3 not found!"
-    echo "Please install: sudo apt install python3 python3-pip"
+# ============================================================
+# 必须使用【系统】Python 构建：conda/miniforge 的 Tk 只能看到极少的
+# 核心位图字体（无 CJK），打包后应用内中文会回退到 song ti 等位图字体，
+# 显示异常。系统 /usr/bin/python3 的 Tk 能看到系统安装的 Noto CJK 字体。
+# ============================================================
+BUILD_PYTHON=""
+for cand in /usr/bin/python3 /usr/local/bin/python3; do
+    if [ -x "$cand" ] && "$cand" -c "import tkinter" 2>/dev/null; then
+        BUILD_PYTHON="$cand"
+        break
+    fi
+done
+
+if [ -z "$BUILD_PYTHON" ]; then
+    # 系统 python 缺 tkinter，尝试安装 python3-tk 后重试
+    if [ -x /usr/bin/python3 ]; then
+        echo "[WARN] system python3 lacks tkinter, installing python3-tk..."
+        sudo apt-get install -y python3-tk python3-venv
+        if /usr/bin/python3 -c "import tkinter" 2>/dev/null; then
+            BUILD_PYTHON=/usr/bin/python3
+        fi
+    fi
+fi
+
+if [ -z "$BUILD_PYTHON" ]; then
+    echo "[ERROR] 未找到带 tkinter 的系统 Python（/usr/bin/python3）。"
+    echo "conda/miniforge 的 Python 不能用于构建（其 Tk 看不到系统 CJK 字体）。"
+    echo "请安装： sudo apt install -y python3 python3-venv python3-tk"
     exit 1
+fi
+echo "[INFO] 使用系统 Python 构建： $BUILD_PYTHON ($("$BUILD_PYTHON" --version 2>&1))"
+
+# 确保 venv + ensurepip 可用（系统 python 需 python3-venv 包）
+if ! "$BUILD_PYTHON" -c "import ensurepip" 2>/dev/null; then
+    echo "[WARN] python3-venv/ensurepip 缺失，正在安装 python3-venv..."
+    PYVER=$("$BUILD_PYTHON" -c "import sys; print('%d.%d' % sys.version_info[:2])")
+    sudo apt-get install -y python3-venv "python${PYVER}-venv" 2>/dev/null || sudo apt-get install -y python3-venv
 fi
 
 echo "[1/4] Checking system dependencies..."
-# Check for tkinter
-python3 -c "import tkinter" 2>/dev/null || {
-    echo "[WARN] tkinter not found, installing python3-tk..."
-    sudo apt-get install -y python3-tk
-}
 
 # Check for xdotool (required for Linux window management)
 if ! command -v xdotool &> /dev/null; then
@@ -43,12 +71,12 @@ fi
 VENV_DIR="/tmp/commandsender-build-venv"
 echo "[2/4] Creating isolated build environment..."
 rm -rf "$VENV_DIR"
-python3 -m venv "$VENV_DIR"
+"$BUILD_PYTHON" -m venv "$VENV_DIR"
 
-# Strip libpython 调试符号（conda-forge 的 libpython 通常 ~32MB，
-# strip 后可降至 ~5MB，对最终二进制体积影响巨大）
-PYTHON_LIB="$VENV_DIR/lib/python3.13/lib-dynload/../../libpython3.13.so.1.0"
-if [ -f "$PYTHON_LIB" ]; then
+# Strip libpython 调试符号（仅当存在时；system python 通常无此文件，
+# conda-forge 的 libpython 含大量调试符号，strip 后可大幅减体）
+PYTHON_LIB=$(find "$VENV_DIR" -maxdepth 3 -name 'libpython*.so*' 2>/dev/null | head -1)
+if [ -n "$PYTHON_LIB" ] && [ -f "$PYTHON_LIB" ]; then
     echo "[INFO] Stripping debug symbols from libpython..."
     ls -lh "$PYTHON_LIB"
     strip --strip-unneeded "$PYTHON_LIB" 2>/dev/null && ls -lh "$PYTHON_LIB"

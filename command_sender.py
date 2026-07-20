@@ -215,12 +215,18 @@ python -m pip install --upgrade pip"""
 
     def setup_ui(self):
         # ===== 设置全局默认字体（确保所有组件中文正常显示）=====
-        # 修改 Tk 默认字体（所有 tk/ttk 组件均会继承此设置）
-        try:
-            default_font = tkfont.nametofont('TkDefaultFont')
-            default_font.configure(family=get_font_ui(), size=10, weight='normal')
-        except Exception:
-            pass
+        # 修改 Tk 全部命名字体（tk/ttk 各类组件分别继承不同的命名字体：
+        # 标签/按钮用 TkDefaultFont，输入框/Text 用 TkTextFont，
+        # 菜单用 TkMenuFont 等），逐一设为 CJK 字体，避免个别控件回退到
+        # 无中文字形的字体导致显示异常。
+        ui_family = get_font_ui()
+        for _fname in ('TkDefaultFont', 'TkTextFont', 'TkMenuFont',
+                       'TkHeadingFont', 'TkCaptionFont', 'TkSmallCaptionFont',
+                       'TkTooltipFont', 'TkIconFont'):
+            try:
+                tkfont.nametofont(_fname).configure(family=ui_family)
+            except Exception:
+                pass
 
         ui_font = (get_font_ui(), 10)
         style = ttk.Style()
@@ -255,15 +261,21 @@ python -m pip install --upgrade pip"""
         text_frame = ttk.LabelFrame(main_frame, text="命令内容（用鼠标拖拽选择）", padding="5")
         text_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
 
-        self.text_widget = tk.Text(text_frame, font=(get_font_text(), 11), wrap=tk.NONE,
+        # wrap=tk.WORD：命令过长时自动换行显示，无需横向拖动；
+        # 换行仅为显示效果，每条命令仍是同一逻辑行，发送时取完整命令
+        self.text_widget = tk.Text(text_frame, font=(get_font_text(), 11), wrap=tk.WORD,
                                    undo=True, maxundo=-1)
         v_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text_widget.yview)
-        h_scroll = ttk.Scrollbar(text_frame, orient=tk.HORIZONTAL, command=self.text_widget.xview)
-        self.text_widget.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        self.text_widget.configure(yscrollcommand=v_scroll.set)
 
         self.text_widget.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         v_scroll.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        h_scroll.grid(row=1, column=0, sticky=(tk.W, tk.E))
+
+        # 修复 Linux 下 Tk Text 默认粘贴不覆盖选区的问题：
+        # 绑定自定义粘贴处理，先删除选中内容再插入
+        self.text_widget.bind('<<Paste>>', self._on_paste)
+        self.text_widget.bind('<Control-v>', self._on_paste)
+        self.text_widget.bind('<Control-V>', self._on_paste)
 
         # 修复 Linux 下 Tk Text 默认粘贴不覆盖选区的问题：
         # 绑定自定义粘贴处理，先删除选中内容再插入
